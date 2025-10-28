@@ -1,9 +1,23 @@
 FactoryBot.define do
   factory :product do
-    product_name { "MyString" }
-    merchant { "MyString" }
-    purchase_date { "2025-10-28" }
-    warranty_months { 1 }
-    issue_description { "MyText" }
+    product_name { "Test Product" }
+    merchant { "Amazon" }
+    purchase_date { Date.today }
+    warranty_months { 12 }
+    issue_description { nil }
+
+    trait :expired do
+      purchase_date { 2.years.ago }
+      warranty_months { 12 }
+    end
+
+    trait :expiring_soon do
+      purchase_date { 11.months.ago }
+      warranty_months { 12 }
+    end
+
+    trait :long_warranty do
+      warranty_months { 36 }
+    end
   end
 end
