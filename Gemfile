@@ -55,9 +55,15 @@ group :development, :test do
 
   gem "rspec-rails", "~> 6.0"
   gem "cucumber-rails", require: false
-  gem "capybara"
-  gem "selenium-webdriver"
   gem "factory_bot_rails" 
+
+  gem 'omniauth'
+  gem 'omniauth-google-oauth2'
+  gem 'omniauth-rails_csrf_protection'
+  gem 'google-api-client'
+  gem 'attr_encrypted'
+  gem 'sidekiq'
+
 end
 
 group :development do
@@ -71,3 +77,5 @@ group :test do
   gem "capybara"
   gem "selenium-webdriver"
 end
+
+

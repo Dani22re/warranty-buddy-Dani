@@ -1,20 +1,17 @@
 Rails.application.routes.draw do
-  # Root route - main dashboard page
   root "dashboard#index"
 
-  # Connect Gmail (mock)
-  post "connect_gmail", to: "dashboard#connect_gmail"
+  # OAuth callback & failure
+  get '/auth/:provider/callback', to: 'dashboard#google_auth'
+  get '/auth/failure', to: redirect('/')
 
-  # Upload a new receipt
-  post "upload", to: "dashboard#upload"
-
-  # API routes
-  get "api/warranties", to: "dashboard#api_warranties"
-  get "api/health", to: "dashboard#api_health"
-
-  # Reset (for mock/testing)
-  post "reset", to: "dashboard#reset"
-
-  # Rails health check (default)
-  get "up" => "rails/health#show", as: :rails_health_check
+  # Dashboard routes
+  get "dashboard/index"
+  get "dashboard/connect_gmail"
+  get "dashboard/upload"
+  post "/upload", to: "dashboard#upload"
+  get "dashboard/api_warranties"
+  get "dashboard/api_health"
+  get "dashboard/reset"
+  post "/disconnect_gmail", to: "dashboard#disconnect_gmail"
 end

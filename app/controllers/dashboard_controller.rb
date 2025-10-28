@@ -1,16 +1,25 @@
 class DashboardController < ApplicationController
   protect_from_forgery with: :exception
+  before_action :set_gmail_status
 
   def index
     @title = "Warranty Buddy  -  Iteration 1"
     @subtitle = "Your Digital Memory for Every Purchase"
-    @gmail_connected = session[:gmail_connected] || false
     @warranties = Product.order(:id)
+    # For iteration 1, we are not fetching Gmail messages yet
+    @gmail_messages = []
   end
 
-  def connect_gmail
-    session[:gmail_connected] = true
-    flash[:notice] = "Gmail (Mock) connected successfully."
+
+  # Called by OmniAuth callback
+  def google_auth
+    auth_info = request.env['omniauth.auth']
+
+    session[:gmail_uid] = auth_info.uid
+    session[:gmail_token] = auth_info.credentials.token
+    session[:gmail_refresh_token] = auth_info.credentials.refresh_token
+
+    flash[:notice] = "Gmail connected successfully!"
     redirect_to root_path
   end
 
@@ -23,11 +32,20 @@ class DashboardController < ApplicationController
       return
     end
 
+    purchase_date = begin
+      Date.parse(params[:purchase_date])
+    rescue ArgumentError, TypeError
+      Date.today
+    end
+
+    warranty_months = (params[:warranty_length].presence || 12).to_i
+    warranty_months = 0 if warranty_months.negative?
+
     Product.create!(
       product_name: params[:product],
       merchant: params[:merchant].presence || "Amazon",
-      purchase_date: Date.today,
-      warranty_months: (params[:warranty_length].presence || 12).to_i,
+      purchase_date: purchase_date,
+      warranty_months: warranty_months,
       issue_description: params[:issue_description]
     )
 
@@ -47,12 +65,27 @@ class DashboardController < ApplicationController
   end
 
   def api_health
-    render json: { ok: true, gmail_connected: (session[:gmail_connected] || false) }, status: :ok
+    render json: { ok: true, gmail_connected: @gmail_connected }, status: :ok
   end
 
   def reset
-    session[:gmail_connected] = false
+    session[:gmail_uid] = nil
+    session[:gmail_token] = nil
+    session[:gmail_refresh_token] = nil
     Product.delete_all
     head :ok
+  end
+
+  def disconnect_gmail
+    session[:gmail_uid] = nil
+    session[:gmail_token] = nil
+    session[:gmail_refresh_token] = nil
+    redirect_to root_path, notice: "Gmail disconnected."
+  end
+
+  private
+
+  def set_gmail_status
+    @gmail_connected = session[:gmail_token].present?
   end
 end
