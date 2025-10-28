@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title><%= @title %></title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+    h1 { margin: 0 0 .25rem 0; }
+    .muted { color: #666; margin-bottom: 1rem; }
+    .row { display: flex; gap: 2rem; align-items: center; margin: 1rem 0; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #ddd; padding: .5rem .75rem; text-align: left; }
+    .flash { background: #eefbea; border: 1px solid #bde5a6; padding: .5rem .75rem; margin: .75rem 0; }
+    .btn { padding: .5rem .75rem; border: 1px solid #333; background: #fff; cursor: pointer; }
+    .badge { padding: .1rem .5rem; border-radius: .5rem; border: 1px solid #ccc; }
+    .ok { color: #0a7a2f; border-color: #0a7a2f; }
+    .not { color: #a11; border-color: #a11; }
+    form { display: inline-block; }
+    label { display: block; margin-top: .5rem; }
+    input[type="text"], input[type="number"] { padding: .4rem .5rem; width: 16rem; }
+  </style>
+</head>
+<body>
+  <h1><%= @title %></h1>
+  <div class="muted"><%= @subtitle %></div>
+
+  <% if flash[:notice] %>
+    <div class="flash"><%= flash[:notice] %></div>
+  <% end %>
+  <% if flash[:alert] %>
+    <div class="flash" style="background:#ffdede;"><%= flash[:alert] %></div>
+  <% end %>
+
+  <div class="row">
+    <form action="/connect-gmail" method="post">
+      <%= csrf_meta_tags %>
+      <button class="btn" type="submit">Connect Gmail (Mock)</button>
+    </form>
+    <div>
+      Status:
+      <% if @gmail_connected %>
+        <span class="badge ok">Connected</span>
+      <% else %>
+        <span class="badge not">Not Connected</span>
+      <% end %>
+    </div>
+  </div>
+
+  <h3>Upload a new receipt</h3>
+  <form action="/upload" method="post">
+    <%= csrf_meta_tags %>
+    <label>Product
+      <input type="text" name="product" />
+    </label>
+    <label>Merchant (optional)
+      <input type="text" name="merchant" />
+    </label>
+    <label>Warranty Length (months)
+      <input type="number" name="warranty_length" />
+    </label>
+    <button type="submit">Upload</button>
+  </form>
+
+  <h3>Warranties</h3>
+  <table aria-label="warranties">
+    <thead>
+      <tr>
+        <th>ID</th><th>Product</th><th>Merchant</th><th>Purchase Date</th><th>Warranty (months)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if @warranties.empty? %>
+        <tr><td colspan="5">No warranties yet.</td></tr>
+      <% else %>
+        <% @warranties.each do |w| %>
+          <tr>
+            <td><%= w.id %></td>
+            <td><%= w.product_name %></td>
+            <td><%= w.merchant %></td>
+            <td><%= w.purchase_date.strftime("%Y-%m-%d") %></td>
+            <td><%= w.warranty_months %></td>
+          </tr>
+        <% end %>
+      <% end %>
+    </tbody>
+  </table>
+</body>
+</html>
