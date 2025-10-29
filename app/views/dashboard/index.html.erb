@@ -372,24 +372,18 @@
   });
   
   function editWarranty(warrantyId, row) {
-    // Get current values from the row
     const cells = row.querySelectorAll('td');
     const productName = cells[0].textContent.trim();
     const merchant = cells[1].textContent.trim();
     const purchaseDate = cells[2].textContent.trim();
     const warrantyMonths = cells[3].textContent.replace('~', '').trim();
     
-    // Debug logging
-    console.log('Original purchase date from table:', purchaseDate);
-    
-    // Populate the edit form
     document.getElementById('editWarrantyId').value = warrantyId;
     document.getElementById('editProductName').value = productName;
     document.getElementById('editMerchant').value = merchant;
     document.getElementById('editPurchaseDate').value = purchaseDate;
     document.getElementById('editWarrantyMonths').value = warrantyMonths;
     
-    // Show the modal
     document.getElementById('editModal').style.display = 'block';
   }
   
@@ -405,12 +399,10 @@
       credentials: 'same-origin'
     })
     .then(response => {
-      // Always remove the row - if it fails, it will be handled by the catch
       row.style.transition = 'opacity 0.3s ease';
       row.style.opacity = '0';
       setTimeout(() => {
         row.remove();
-        // If no warranties left, show message
         const tbody = document.querySelector('table tbody');
         if (tbody && tbody.querySelectorAll('tr').length === 0) {
           tbody.innerHTML = '<tr><td colspan="8">No warranties yet.</td></tr>';
@@ -419,11 +411,9 @@
     })
     .catch(error => {
       console.error('Error deleting warranty:', error);
-      // Silently fail - don't show alerts
     });
   }
   
-  // Handle edit form submission
   document.getElementById('editForm').addEventListener('submit', (e) => {
     e.preventDefault();
     
@@ -438,9 +428,6 @@
       warranty_months: formData.get('warranty_months')
     };
     
-    // Debug logging
-    console.log('Sending update data:', updateData);
-    
     fetch(updateUrl, {
       method: 'PATCH',
       headers: {
@@ -452,26 +439,21 @@
     })
     .then(response => {
       if (response.ok) {
-        // Close modal and reload page to show updated data
         document.getElementById('editModal').style.display = 'none';
         location.reload();
       } else {
         console.error('Failed to update warranty');
-        // Silently fail - don't show alerts
       }
     })
     .catch(error => {
       console.error('Error updating warranty:', error);
-      // Silently fail - don't show alerts
     });
   });
   
-  // Handle cancel button
   document.getElementById('cancelEdit').addEventListener('click', () => {
     document.getElementById('editModal').style.display = 'none';
   });
   
-  // Close modal when clicking outside
   document.getElementById('editModal').addEventListener('click', (e) => {
     if (e.target.id === 'editModal') {
       document.getElementById('editModal').style.display = 'none';

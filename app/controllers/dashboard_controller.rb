@@ -6,23 +6,19 @@ class DashboardController < ApplicationController
     @title = "Warranty Buddy  -  Iteration 1"
     @subtitle = "Your Digital Memory for Every Purchase"
     
-    # Handle search and filtering
     @search_term = params[:search]
     @status_filter = params[:status]
     @merchant_filter = params[:merchant]
     @sort_by = params[:sort] || 'expiry_date'
     
-    # Only show warranties for the current user
     if @gmail_connected && session[:gmail_uid]
       @warranties = Product.for_user(session[:gmail_uid])
     else
-      @warranties = Product.none # Show no warranties if not connected
+      @warranties = Product.none
     end
     
-    # Apply search
     @warranties = @warranties.search(@search_term) if @search_term.present?
     
-    # Apply status filter
     case @status_filter
     when 'active'
       @warranties = @warranties.active
@@ -32,13 +28,9 @@ class DashboardController < ApplicationController
       @warranties = @warranties.expiring_soon
     end
     
-    # Apply merchant filter
     @warranties = @warranties.by_merchant(@merchant_filter) if @merchant_filter.present?
-    
-    # Get unique merchants for filter dropdown (only for current user) - before ordering
     @merchants = @warranties.distinct.pluck(:merchant).compact.sort
     
-    # Apply sorting
     case @sort_by
     when 'expiry_date'
       @warranties = @warranties.order(:purchase_date, :warranty_months)
@@ -50,12 +42,9 @@ class DashboardController < ApplicationController
       @warranties = @warranties.order(:merchant)
     end
     
-    # For iteration 1, we are not fetching Gmail messages yet
     @gmail_messages = []
   end
 
-
-  # Called by OmniAuth callback
   def google_auth
     auth_info = request.env['omniauth.auth']
 
@@ -67,7 +56,6 @@ class DashboardController < ApplicationController
   end
 
   def oauth_failure
-    # Clear any existing session data
     session.delete(:gmail_uid)
     session.delete(:gmail_token)
     session.delete(:gmail_refresh_token)
@@ -134,7 +122,6 @@ class DashboardController < ApplicationController
   end
 
   def reset
-    # Clear session but keep warranties - they will reappear when user logs back in
     session[:gmail_uid] = nil
     session[:gmail_token] = nil
     session[:gmail_refresh_token] = nil
@@ -142,7 +129,6 @@ class DashboardController < ApplicationController
   end
 
   def disconnect_gmail
-    # Clear session but keep warranties - they will reappear when user logs back in
     session[:gmail_uid] = nil
     session[:gmail_token] = nil
     session[:gmail_refresh_token] = nil
@@ -160,11 +146,8 @@ class DashboardController < ApplicationController
       parsed_receipts.each do |receipt_data|
         next if receipt_data[:product_name].blank?
         
-        # Check if product already exists (by email ID or similar product)
         existing_product = Product.find_by(raw_email_id: receipt_data[:raw_email_id])
         next if existing_product
-
-        # Skip if no valid data found
         next if receipt_data[:product_name].blank? || receipt_data[:purchase_date].blank?
 
         Product.create!(
@@ -263,7 +246,6 @@ class DashboardController < ApplicationController
 
     product = Product.for_user(session[:gmail_uid]).find_by(id: params[:id])
     if product
-      # Parse the date properly
       purchase_date = nil
       if params[:purchase_date].present?
         begin

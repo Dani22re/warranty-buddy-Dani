@@ -1,8 +1,5 @@
 Given("the app is running") do
-  # App is running in test environment
-  # Clear any existing data for clean test state
   Product.destroy_all
-  # Clear session data by visiting root
   visit "/"
 end
 
@@ -11,13 +8,11 @@ Given("I am on the dashboard") do
 end
 
 Given("I have connected my Gmail account") do
-  # Mock Gmail connection using OAuth test helper
   mock_google_oauth_success
   simulate_oauth_callback
 end
 
 Given("I have not connected my Gmail account") do
-  # Clear Gmail connection using OAuth test helper
   clear_oauth_mocks
   visit "/"
 end
@@ -35,12 +30,10 @@ When("I visit {string}") do |path|
 end
 
 When("I successfully authenticate with Google") do
-  # Simulate OAuth callback using OAuth test helper
   simulate_oauth_callback
 end
 
 Then("I should see {string}") do |text|
-  # Handle specific text variations
   if text == "Warranty Buddy  -  Iteration 1"
     expect(page).to have_content("Warranty Buddy - Iteration 1")
   else
@@ -89,27 +82,22 @@ end
 
 When("I click {string}") do |button_text|
   if button_text == "Connect Gmail"
-    # Mock OAuth redirect using OAuth test helper
     mock_google_oauth_success
     click_button button_text
   elsif button_text == "Parse Gmail Receipts"
-    # Simulate parsing without actually calling Gmail API
     click_button button_text
   elsif button_text == "Apply"
     find('button[type="submit"]', text: "Apply").click
-    # Wait for form submission to complete
     sleep 1
   elsif button_text == "Reset"
     click_link "Reset"
   elsif button_text == "Save Changes"
     find('button[type="submit"]', text: "Save Changes").click
-    # Wait for page reload after save
     sleep 1
   else
     begin
       click_button button_text
     rescue Capybara::ElementNotFound
-      # Try as link if button not found
       click_link button_text
     end
   end
@@ -121,7 +109,6 @@ When("I click {string} button") do |button_text|
   elsif button_text == "Export CSV"
     click_link "⬇️ Export CSV"
   elsif button_text == "Export iCal"
-    # Find and submit the iCal form
     find('button[type="submit"][class*="export-btn--ical"]').click
   else
     click_button button_text
@@ -129,8 +116,6 @@ When("I click {string} button") do |button_text|
 end
 
 Then("I should be redirected to Google OAuth") do
-  # Skip this check in test environment as OAuth redirects are complex
-  # Just verify we're on the right path
   expect(current_path).to match(/\//)
 end
 
@@ -335,37 +320,31 @@ Given("I have added a warranty expiring on {string}") do |date|
 end
 
 When("I click the edit button for {string}") do |product_name|
-  # Find the row with the product and click edit button
   within("table tbody") do
     row = find("tr", text: product_name)
     within(row) do
       find("button.edit-btn").click
     end
   end
-  # Wait for JavaScript to execute
   sleep 1
 end
 
 Then("I should see an edit modal") do
-  # Wait for modal to appear
   expect(page).to have_css("#editModal", visible: true, wait: 5)
   expect(page).to have_content("Edit Warranty")
 end
 
 When("I click the delete button for {string}") do |product_name|
-  # Find the row with the product and click delete button
   within("table tbody") do
     row = find("tr", text: product_name)
     within(row) do
       find("button.delete-btn").click
     end
   end
-  # Wait for deletion to complete
   sleep 0.5
 end
 
 Then("{string} should be removed from the table") do |product_name|
-  # Wait for deletion to complete
   within("table tbody") do
     expect(page).not_to have_content(product_name, wait: 5)
   end
