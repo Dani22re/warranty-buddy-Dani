@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title><%= @title %></title>
+  
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
     h1 { margin: 0 0 .25rem 0; }
@@ -29,6 +30,30 @@
     .status-badge { padding: .15rem .5rem; border-radius: .5rem; font-size: .85rem; }
     .status-active { background: #e6f4ea; color: #1e8e3e; }
     .status-expired { background: #fce8e6; color: #c5221f; }
+    .export-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;  /* space above the button */
+  margin-bottom: 3rem;  /* space below the button */
+}
+
+.export-btn {
+  background: #0b57d0;
+  color: #fff;
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.export-btn:hover {
+  background: #094bb0;
+  transform: translateY(-2px);
+}
+
 
     /* Filter bar */
     .filters { margin: 1rem 0 0.5rem; }
@@ -158,5 +183,9 @@
       <% end %>
     </tbody>
   </table>
+  <div class="export-container">
+  <%= link_to "⬇️ Export CSV", export_products_path(format: :csv), class: "export-btn" %>
+</div>
+
 </body>
 </html>

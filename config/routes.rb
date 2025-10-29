@@ -5,6 +5,12 @@ Rails.application.routes.draw do
   get '/auth/:provider/callback', to: 'dashboard#google_auth'
   get '/auth/failure', to: redirect('/')
 
+  #csv routes
+  resources :products, only: [] do
+    collection { get :export }  # /products/export.csv
+  end
+  
+
   # Dashboard routes
   get "dashboard/index"
   get "dashboard/connect_gmail"
