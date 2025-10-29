@@ -1,19 +1,39 @@
-ENV['RAILS_ENV'] ||= 'test'
-require File.expand_path('../../../config/environment', __FILE__)
-
 require 'cucumber/rails'
 require 'capybara/rails'
+require 'capybara/cucumber'
+require 'capybara/session'
+require 'omniauth'
+require 'omniauth/test'
 
-# Use rack_test for speed; switch to :selenium if you need JS
+# Configure Capybara
 Capybara.default_driver = :rack_test
-Capybara.app = Rails.application
+Capybara.javascript_driver = :selenium_chrome_headless
 
-# Disable transactional fixtures if using DatabaseCleaner later
-Cucumber::Rails::Database.javascript_strategy = :transaction
+# Configure OmniAuth for testing
+OmniAuth.config.test_mode = true
+OmniAuth.config.logger = Rails.logger
 
-# Clean database between scenarios
+# Configure test environment
+Rails.application.config.force_ssl = false
+
+# Load test helpers
+require_relative 'oauth_test_helper'
+require_relative 'test_helpers'
+
+# Before each scenario
 Before do
-  Product.delete_all
+  # Clear any existing OAuth mocks
+  clear_oauth_mocks
+  # Clear database
+  Product.destroy_all
+  # Clear session
+  Capybara.reset_sessions!
 end
 
-
+# After each scenario
+After do
+  # Clean up
+  clear_oauth_mocks
+  Product.destroy_all
+  Capybara.reset_sessions!
+end
