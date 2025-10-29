@@ -66,8 +66,12 @@ group :development, :test do
   gem 'gemini-ai', '~> 4.3.0'
   gem 'nokogiri'
   gem 'mail'
-  gem "dotenv-rails", groups: [:development, :test]
+  gem 'pdf-reader'
+  gem 'rtesseract'
+  gem 'chronic'
+  gem 'money'
   gem "icalendar"
+  gem "dotenv-rails", groups: [:development, :test]
 
 end
 

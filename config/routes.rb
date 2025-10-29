@@ -31,4 +31,6 @@ Rails.application.routes.draw do
   post "/parse_gmail_receipts", to: "dashboard#parse_gmail_receipts"
   post "/check_warranty_eligibility", to: "dashboard#check_warranty_eligibility"
   get "/lookup_warranty_info", to: "dashboard#lookup_warranty_info"
+  delete "/warranties/:id", to: "dashboard#delete_warranty", as: :delete_warranty
+  patch "/warranties/:id", to: "dashboard#update_warranty", as: :update_warranty
 end
