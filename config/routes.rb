@@ -5,10 +5,18 @@ Rails.application.routes.draw do
   get '/auth/:provider/callback', to: 'dashboard#google_auth'
   get '/auth/failure', to: redirect('/')
 
-  #csv routes
+  #csv/ical routes
   resources :products, only: [] do
     collection { get :export }  # /products/export.csv
   end
+
+  resources :products, only: [] do
+    collection do
+      get :export                  # CSV
+      get :calendar, defaults: { format: :ics }  # iCal
+    end
+  end
+
   
 
   # Dashboard routes
