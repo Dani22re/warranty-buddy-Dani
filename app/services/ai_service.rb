@@ -5,7 +5,7 @@ class AiService
       @client = Gemini.new(
         credentials: {
           service: 'generative-language-api',
-          api_key: Rails.application.credentials.dig(:google, :gemini_api_key) || 'AIzaSyDijb5niCKfGIhjfxaRO8CouEykHSIdcXs'
+          api_key: Rails.application.credentials.dig(:google, :gemini_api_key)
         },
         options: { model: 'gemini-2.0-flash', server_sent_events: false }
       )
@@ -20,6 +20,9 @@ class AiService
 
   def extract_receipt_info(email_content)
     return nil unless @client
+
+    Rails.logger.info "🤖 AI Service: Starting receipt analysis"
+    Rails.logger.debug "📧 Email content length: #{email_content.length}"
 
     prompt = <<~PROMPT
       Analyze this email and determine if it contains purchase/receipt information for a physical product that would have warranty coverage, return policies, or other important deadlines.
@@ -54,23 +57,32 @@ class AiService
       #{email_content[0..2000]}...
     PROMPT
 
+    Rails.logger.debug "📝 Prompt length: #{prompt.length}"
+
     response = @client.generate_content({
       contents: { role: "user", parts: { text: prompt } }
     })
 
     response_text = response.dig("candidates", 0, "content", "parts", 0, "text")
+    Rails.logger.debug "🤖 AI Response: #{response_text}"
     
     # Clean up markdown code blocks if present
     response_text = response_text.gsub(/```json\s*/, '').gsub(/```\s*$/, '').strip
     
     result = JSON.parse(response_text)
+    Rails.logger.info "🤖 AI Analysis Result: #{result.inspect}"
     
     # Only return data if AI confirms this is a receipt
-    return nil unless result["is_receipt"] == true
-    
-    result
+    if result["is_receipt"] == true
+      Rails.logger.info "✅ AI confirmed this is a receipt"
+      return result
+    else
+      Rails.logger.info "❌ AI determined this is not a receipt"
+      return nil
+    end
   rescue => e
-    Rails.logger.error "AI extraction failed: #{e.message}"
+    Rails.logger.error "💥 AI extraction failed: #{e.message}"
+    Rails.logger.error "💥 Backtrace: #{e.backtrace.first(5).join('\n')}"
     nil
   end
 

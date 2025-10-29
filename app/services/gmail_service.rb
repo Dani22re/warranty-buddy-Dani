@@ -23,6 +23,8 @@ class GmailService
     return [] unless @service.authorization
 
     begin
+      Rails.logger.info "🔍 Starting Gmail receipt parsing for user: #{user_id}"
+      
       # Use AI to intelligently search for receipt emails - much broader approach
       # Search for emails that might contain purchase/receipt information
       receipt_queries = [
@@ -46,28 +48,52 @@ class GmailService
       ]
       
       all_messages = []
-      receipt_queries.each do |query|
+      receipt_queries.each_with_index do |query, index|
+        Rails.logger.info "🔎 Query #{index + 1}/#{receipt_queries.length}: #{query}"
         messages = list_messages(user_id, query)
+        Rails.logger.info "📧 Found #{messages.length} messages for query #{index + 1}"
         all_messages.concat(messages)
       end
 
+      Rails.logger.info "📊 Total messages found: #{all_messages.length}"
+      
       # Remove duplicates and let AI determine if each message is actually a receipt
       unique_messages = all_messages.uniq { |msg| msg.id }
+      Rails.logger.info "🔄 After deduplication: #{unique_messages.length} unique messages"
+      
       parsed_receipts = []
+      ai_processed = 0
+      ai_receipts_found = 0
 
-      unique_messages.each do |message|
+      unique_messages.each_with_index do |message, index|
         begin
+          Rails.logger.info "🤖 Processing message #{index + 1}/#{unique_messages.length} (ID: #{message.id})"
           full_message = get_message(message.id, user_id)
+          
+          # Log basic message info for debugging
+          subject = full_message.payload.headers.find { |h| h.name == 'Subject' }&.value || 'No Subject'
+          from = full_message.payload.headers.find { |h| h.name == 'From' }&.value || 'Unknown Sender'
+          Rails.logger.info "📧 Message: '#{subject}' from #{from}"
+          
           parsed_receipt = parse_single_receipt(full_message)
-          parsed_receipts << parsed_receipt if parsed_receipt
+          ai_processed += 1
+          
+          if parsed_receipt
+            ai_receipts_found += 1
+            Rails.logger.info "✅ AI identified as receipt: #{parsed_receipt[:product_name]} from #{parsed_receipt[:merchant]} (confidence: #{parsed_receipt[:confidence]})"
+            parsed_receipts << parsed_receipt
+          else
+            Rails.logger.info "❌ AI determined this is not a receipt"
+          end
         rescue => e
-          Rails.logger.error "Failed to parse message #{message.id}: #{e.message}"
+          Rails.logger.error "💥 Failed to parse message #{message.id}: #{e.message}"
         end
       end
 
+      Rails.logger.info "🎯 Final Results: #{ai_processed} messages processed by AI, #{ai_receipts_found} receipts found, #{parsed_receipts.length} total receipts"
       parsed_receipts
     rescue => e
-      Rails.logger.error "Gmail API error: #{e.message}"
+      Rails.logger.error "💥 Gmail API error: #{e.message}"
       []
     end
   end
@@ -77,11 +103,23 @@ class GmailService
   def parse_single_receipt(message)
     # Extract email content
     email_content = extract_email_content(message)
-    return nil if email_content.blank?
+    if email_content.blank?
+      Rails.logger.warn "⚠️ No email content extracted from message #{message.id}"
+      return nil
+    end
+
+    Rails.logger.debug "📝 Email content length: #{email_content.length} characters"
+    Rails.logger.debug "📝 First 200 chars: #{email_content[0..200]}..."
 
     # Use AI to determine if this is a receipt and extract information
     ai_data = @ai_service.extract_receipt_info(email_content)
-    return nil unless ai_data # AI determined this is not a receipt or extraction failed
+    
+    if ai_data.nil?
+      Rails.logger.debug "🤖 AI returned nil - not a receipt or extraction failed"
+      return nil
+    end
+    
+    Rails.logger.debug "🤖 AI response: #{ai_data.inspect}"
 
     # Convert to Product attributes
     {
