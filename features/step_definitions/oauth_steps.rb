@@ -38,7 +38,7 @@ end
 When("I deny access to the application") do
   # Simulate user denying access
   mock_google_oauth_failure
-  simulate_oauth_callback
+  simulate_oauth_failure_callback
 end
 
 When("I connect with a different Google account {string}") do |email|

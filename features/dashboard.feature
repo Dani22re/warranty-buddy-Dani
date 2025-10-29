@@ -142,6 +142,7 @@ Feature: Warranty Buddy Dashboard
     Then I should see "12" months warranty with "~" estimate indicator
 
   # USER STORY 11: Edit warranty entry
+  @javascript
   Scenario: User edits warranty information
     As a user
     I want to edit warranty details
@@ -162,6 +163,7 @@ Feature: Warranty Buddy Dashboard
     And I should see "36" months warranty
 
   # USER STORY 12: Delete warranty entry
+  @javascript
   Scenario: User deletes a warranty entry
     As a user
     I want to delete warranty entries

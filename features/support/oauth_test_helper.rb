@@ -45,6 +45,11 @@ module OAuthTestHelper
     visit "/auth/google_oauth2/callback"
   end
 
+  def simulate_oauth_failure_callback
+    # Simulate OAuth failure callback
+    visit "/auth/failure"
+  end
+
   def expect_oauth_redirect
     # Check that we're being redirected to Google OAuth
     expect(current_url).to include('accounts.google.com')

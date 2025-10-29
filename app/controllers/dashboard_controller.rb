@@ -66,6 +66,15 @@ class DashboardController < ApplicationController
     redirect_to root_path
   end
 
+  def oauth_failure
+    # Clear any existing session data
+    session.delete(:gmail_uid)
+    session.delete(:gmail_token)
+    session.delete(:gmail_refresh_token)
+    
+    redirect_to root_path, alert: "Gmail connection was denied or failed"
+  end
+
   def upload
     if params[:product].blank?
       respond_to do |format|
@@ -254,11 +263,23 @@ class DashboardController < ApplicationController
 
     product = Product.for_user(session[:gmail_uid]).find_by(id: params[:id])
     if product
+      # Parse the date properly
+      purchase_date = nil
+      if params[:purchase_date].present?
+        begin
+          purchase_date = Date.parse(params[:purchase_date])
+        rescue ArgumentError => e
+          Rails.logger.error "Date parsing error: #{e.message}, date: #{params[:purchase_date]}"
+          head :bad_request
+          return
+        end
+      end
+      
       product.update!(
         product_name: params[:product_name],
         merchant: params[:merchant],
-        purchase_date: params[:purchase_date],
-        warranty_months: params[:warranty_months]
+        purchase_date: purchase_date,
+        warranty_months: params[:warranty_months].to_i
       )
       head :ok
     else

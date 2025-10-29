@@ -3,7 +3,7 @@ Rails.application.routes.draw do
 
   # OAuth callback & failure
   get '/auth/:provider/callback', to: 'dashboard#google_auth'
-  get '/auth/failure', to: redirect('/')
+  get '/auth/failure', to: 'dashboard#oauth_failure'
 
   #csv/ical routes
   resources :products, only: [] do

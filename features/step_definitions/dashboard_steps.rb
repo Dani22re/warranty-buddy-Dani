@@ -342,6 +342,8 @@ When("I click the edit button for {string}") do |product_name|
       find("button.edit-btn").click
     end
   end
+  # Wait for JavaScript to execute
+  sleep 1
 end
 
 Then("I should see an edit modal") do
