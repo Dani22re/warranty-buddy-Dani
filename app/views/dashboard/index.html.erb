@@ -15,6 +15,8 @@
     .btn-primary { background: #0b57d0; color: #fff; border-color: #0b57d0; }
     .btn-secondary { background: #f6f6f6; color: #111; }
     .btn-danger { background: #a11; color: #fff; border-color: #a11; }
+    .btn-sm { padding: .35rem .6rem; font-size: .9rem; }
+    .btn-outline { background:#fff; color:#111; border-color:#bbb; }
     .badge { padding: .1rem .5rem; border-radius: .5rem; border: 1px solid #ccc; }
     .ok { color: #0a7a2f; border-color: #0a7a2f; }
     .not { color: #a11; border-color: #a11; }
@@ -27,6 +29,16 @@
     .status-badge { padding: .15rem .5rem; border-radius: .5rem; font-size: .85rem; }
     .status-active { background: #e6f4ea; color: #1e8e3e; }
     .status-expired { background: #fce8e6; color: #c5221f; }
+
+    /* Filter bar */
+    .filters { margin: 1rem 0 0.5rem; }
+    .filters-form { display:flex; flex-wrap:wrap; gap:.5rem 1rem; align-items:flex-end; }
+    .filters-form .control { display:flex; flex-direction:column; gap:.25rem; }
+    .filters-form .control label { margin-top: 0; font-size: .9rem; color:#444; }
+    .filters-form select,
+    .filters-form input[type="text"] { height: 34px; padding: .25rem .5rem; min-width: 12rem; border:1px solid #bbb; border-radius: .35rem; }
+    .filters-actions { display:flex; align-items:center; gap:.5rem; }
+    .visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
   </style>
 </head>
 <body>
@@ -52,6 +64,46 @@
 </div>
 
 
+  <div class="filters">
+    <form action="/" method="get" class="filters-form">
+      <div class="control">
+        <label class="visually-hidden" for="filter-search">Search</label>
+        <input id="filter-search" type="text" name="search" value="<%= h(@search_term) %>" placeholder="Search product or merchant" />
+      </div>
+      <div class="control">
+        <label class="visually-hidden" for="filter-status">Status</label>
+        <select id="filter-status" name="status">
+          <option value="" <%= 'selected' if @status_filter.blank? %>>All</option>
+          <option value="active" <%= 'selected' if @status_filter == 'active' %>>Active</option>
+          <option value="expired" <%= 'selected' if @status_filter == 'expired' %>>Expired</option>
+          <option value="expiring_soon" <%= 'selected' if @status_filter == 'expiring_soon' %>>Expiring Soon</option>
+        </select>
+      </div>
+      <div class="control">
+        <label class="visually-hidden" for="filter-merchant">Merchant</label>
+        <select id="filter-merchant" name="merchant">
+          <option value="" <%= 'selected' if @merchant_filter.blank? %>>All</option>
+          <% @merchants.each do |m| %>
+            <option value="<%= h(m) %>" <%= 'selected' if @merchant_filter == m %>><%= m %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="control">
+        <label class="visually-hidden" for="filter-sort">Sort by</label>
+        <select id="filter-sort" name="sort">
+          <option value="expiry_date" <%= 'selected' if @sort_by == 'expiry_date' %>>Expiry Date</option>
+          <option value="product_name" <%= 'selected' if @sort_by == 'product_name' %>>Product Name</option>
+          <option value="purchase_date" <%= 'selected' if @sort_by == 'purchase_date' %>>Purchase Date</option>
+          <option value="merchant" <%= 'selected' if @sort_by == 'merchant' %>>Merchant</option>
+        </select>
+      </div>
+      <div class="filters-actions">
+        <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
+        <a href="/" class="btn btn-outline btn-sm">Reset</a>
+      </div>
+    </form>
+  </div>
+
   <details class="section">
     <summary>Add a product warranty</summary>
     <div style="margin-top:.75rem;">
@@ -61,7 +113,7 @@
           <input type="text" name="product" required />
         </label>
         <label>Merchant (optional)
-          <input type="text" name="merchant" placeholder="Amazon (default)" />
+          <input type="text" name="merchant" />
         </label>
         <label>Purchase Date
           <input type="date" name="purchase_date" value="<%= Date.today.strftime('%Y-%m-%d') %>" />
@@ -74,22 +126,7 @@
     </div>
   </details>
 
-  <% if @gmail_connected %>
-    <details class="section">
-      <summary>Gmail Receipt Parsing</summary>
-      <div style="margin-top:.75rem;">
-        <p>Click "Parse Gmail Receipts" to automatically scan your Gmail for purchase receipts and warranty information using AI.</p>
-        <p><strong>What it does:</strong></p>
-        <ul>
-          <li>🔍 Searches your Gmail for purchase-related emails (receipts, confirmations, orders)</li>
-          <li>🤖 Uses Google Gemini AI to intelligently identify actual product receipts</li>
-          <li>📦 Extracts product names, merchants, purchase dates, and warranty information</li>
-          <li>💾 Automatically adds new warranties to your dashboard</li>
-        </ul>
-        <p><em>Note: Only processes emails from the last year and skips duplicates.</em></p>
-      </div>
-    </details>
-  <% end %>
+  
 
   <h3>Warranties</h3>
   <table aria-label="warranties">

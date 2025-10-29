@@ -1,6 +1,6 @@
 class Product < ApplicationRecord
   validates :product_name, presence: true
-  validates :warranty_months, numericality: { greater_than_or_equal_to: 0 }
+  validates :warranty_months, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validates :gmail_uid, presence: true
 
   scope :active, -> { where('(purchase_date + INTERVAL \'1 month\' * warranty_months) >= ?', Date.current) }

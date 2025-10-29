@@ -25,23 +25,24 @@ class AiService
     Rails.logger.debug "📧 Email content length: #{email_content.length}"
 
     prompt = <<~PROMPT
-      Analyze this email and determine if it contains purchase/receipt information for a physical product that would have warranty coverage, return policies, or other important deadlines.
+      Analyze this email and determine if it contains purchase/receipt information for a physical product.
       
-      First, determine if this is actually a receipt for a physical product purchase. Look for:
+      Look for ANY indication this is a purchase receipt for a physical item:
       - Product names, descriptions, or SKUs
       - Purchase amounts, prices, or totals
       - Order numbers or confirmation numbers
-      - Shipping information
+      - Shipping information, tracking numbers
       - Merchant/store information
+      - Words like: "order", "purchase", "bought", "shipped", "delivered", "receipt", "invoice", "confirmation"
       
-      If this is NOT a receipt for a physical product (e.g., subscription, service, digital download, newsletter, etc.), return: {"is_receipt": false}
+      If this is NOT a receipt for a physical product (e.g., subscription, service, digital download, newsletter, course announcement, etc.), return: {"is_receipt": false}
       
       If this IS a receipt for a physical product, extract the following information and return a JSON object:
       {
         "is_receipt": true,
-        "product_name": "exact product name or description",
-        "merchant": "store/website/company name",
-        "purchase_date": "YYYY-MM-DD format",
+        "product_name": "exact product name or description (required)",
+        "merchant": "store/website/company name (required)",
+        "purchase_date": "YYYY-MM-DD format (required - use email date if not specified)",
         "warranty_length_months": number (only if explicitly mentioned, otherwise null),
         "warranty_type": "manufacturer/merchant/extended" (only if mentioned, otherwise null),
         "return_policy_days": number (return deadline in days, if mentioned),
@@ -49,9 +50,8 @@ class AiService
         "confidence": 0.0-1.0 (how confident you are this is a valid receipt)
       }
       
-      Look for warranty information, return policies, exchange deadlines, and any other important dates/deadlines related to the purchase.
-      
-      Be very conservative - only return is_receipt: true if you're confident this is a physical product purchase receipt.
+      IMPORTANT: Accept ANY physical product purchase receipt, even if warranty/return info is missing. 
+      Default to 12 months warranty if not specified. Use the email date as purchase date if not specified.
       
       Email content:
       #{email_content[0..2000]}...

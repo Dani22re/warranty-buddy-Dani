@@ -87,8 +87,9 @@ class DashboardController < ApplicationController
       Date.today
     end
 
-    warranty_months = (params[:warranty_length].presence || 12).to_i
-    warranty_months = 0 if warranty_months.negative?
+    warranty_months = params[:warranty_length].presence
+    warranty_months = warranty_months.to_i if warranty_months
+    warranty_months = 0 if warranty_months && warranty_months.negative?
 
     Product.create!(
       product_name: params[:product],

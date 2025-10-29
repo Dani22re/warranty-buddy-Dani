@@ -1,4 +1,6 @@
 require 'google/apis/gmail_v1'
+require 'mail'
+require 'time'
 
 class GmailService
   Gmail = Google::Apis::GmailV1
@@ -9,9 +11,17 @@ class GmailService
     @ai_service = AiService.new
   end
 
-  def list_messages(user_id = 'me', query = '')
-    result = @service.list_user_messages(user_id, q: query)
-    result.messages || []
+  def list_messages(user_id = 'me', query = '', max_total = 100)
+    messages = []
+    page_token = nil
+    begin
+      remaining = [max_total - messages.length, 100].min
+      break if remaining <= 0
+      result = @service.list_user_messages(user_id, q: query, page_token: page_token, max_results: remaining)
+      messages.concat(result.messages || [])
+      page_token = result.next_page_token
+    end while page_token.present? && messages.length < max_total
+    messages
   end
 
   def get_message(message_id, user_id = 'me')
@@ -25,33 +35,18 @@ class GmailService
     begin
       Rails.logger.info "🔍 Starting Gmail receipt parsing for user: #{user_id}"
       
-      # Use AI to intelligently search for receipt emails - much broader approach
-      # Search for emails that might contain purchase/receipt information
+      # Focused query per request: "your receipt" is broadly used by many merchants
       receipt_queries = [
-        # Broad search for purchase-related emails
-        'subject:(receipt OR confirmation OR order OR purchase OR invoice OR bill OR payment OR shipped OR delivered) newer_than:1y',
-        
-        # Search for emails with common receipt keywords in body
-        'has:attachment (receipt OR invoice OR order OR confirmation) newer_than:1y',
-        
-        # Search for emails from common retail domains (but not restrictive)
-        'from:(amazon.com OR apple.com OR google.com OR microsoft.com OR adobe.com OR spotify.com OR netflix.com OR uber.com OR lyft.com OR doordash.com OR grubhub.com OR instacart.com OR walmart.com OR target.com OR costco.com OR bestbuy.com OR homedepot.com OR lowes.com OR staples.com OR officedepot.com OR gamestop.com OR newegg.com OR dell.com OR hp.com OR lenovo.com OR samsung.com OR sony.com OR lg.com OR canon.com OR nikon.com OR adidas.com OR nike.com OR underarmour.com OR puma.com OR reebok.com OR zappos.com OR footlocker.com OR finishline.com OR dickssportinggoods.com OR ulta.com OR sallybeauty.com OR sephora.com OR nordstrom.com OR macys.com OR kohls.com OR wayfair.com OR overstock.com OR etsy.com OR ebay.com OR shopify.com OR squareup.com OR bedbathandbeyond.com) newer_than:1y',
-        
-        # Search for emails with tracking/shipping info
-        'subject:(tracking OR shipment OR shipped OR delivered OR out for delivery) newer_than:1y',
-        
-        # Search for subscription/recurring payment emails
-        'subject:(subscription OR renewal OR billing OR payment) newer_than:1y',
-        
-        # Search for warranty/registration emails
-        'subject:(warranty OR registration OR product registration OR device registration) newer_than:1y'
+        'in:anywhere "your receipt" newer_than:2y'
       ]
       
       all_messages = []
       receipt_queries.each_with_index do |query, index|
         Rails.logger.info "🔎 Query #{index + 1}/#{receipt_queries.length}: #{query}"
-        messages = list_messages(user_id, query)
-        Rails.logger.info "📧 Found #{messages.length} messages for query #{index + 1}"
+        remaining = 100 - all_messages.length
+        break if remaining <= 0
+        messages = list_messages(user_id, query, remaining)
+        Rails.logger.info "📧 Collected #{messages.length} messages for query #{index + 1} (capped to 100 total)"
         all_messages.concat(messages)
       end
 
@@ -59,6 +54,7 @@ class GmailService
       
       # Remove duplicates and let AI determine if each message is actually a receipt
       unique_messages = all_messages.uniq { |msg| msg.id }
+      unique_messages = unique_messages.first(100)
       Rails.logger.info "🔄 After deduplication: #{unique_messages.length} unique messages"
       
       parsed_receipts = []
@@ -101,7 +97,11 @@ class GmailService
   private
 
   def parse_single_receipt(message)
-    # Extract email content
+    # Headers and content
+    subject = message.payload.headers.find { |h| h.name == 'Subject' }&.value || ''
+    from    = message.payload.headers.find { |h| h.name == 'From' }&.value || ''
+    date_h  = message.payload.headers.find { |h| h.name == 'Date' }&.value
+
     email_content = extract_email_content(message)
     if email_content.blank?
       Rails.logger.warn "⚠️ No email content extracted from message #{message.id}"
@@ -111,45 +111,110 @@ class GmailService
     Rails.logger.debug "📝 Email content length: #{email_content.length} characters"
     Rails.logger.debug "📝 First 200 chars: #{email_content[0..200]}..."
 
-    # Use AI to determine if this is a receipt and extract information
-    ai_data = @ai_service.extract_receipt_info(email_content)
-    
-    if ai_data.nil?
-      Rails.logger.debug "🤖 AI returned nil - not a receipt or extraction failed"
+    # Heuristic: decide if likely a purchase receipt without AI
+    unless likely_receipt_email?(subject, email_content)
+      Rails.logger.info "ℹ️ Heuristics: not a likely receipt"
       return nil
     end
-    
-    Rails.logger.debug "🤖 AI response: #{ai_data.inspect}"
 
-    # Convert to Product attributes
+    merchant = extract_merchant_from_body(email_content) || extract_merchant(from)
+    purchase_date = safe_parse_email_date(date_h) || Date.today
+    product_name = extract_product_name(subject, email_content)
+
     {
-      product_name: ai_data['product_name'],
-      merchant: ai_data['merchant'],
-      purchase_date: parse_date(ai_data['purchase_date']),
-      warranty_months: ai_data['warranty_length_months'] || 12, # Default to 12 months if not specified
-      warranty_type: ai_data['warranty_type'],
-      return_policy_days: ai_data['return_policy_days'],
-      return_deadline: parse_date(ai_data['return_deadline']),
-      confidence: ai_data['confidence'],
-      source: 'gmail_ai_parsed',
+      product_name: product_name,
+      merchant: merchant,
+      purchase_date: purchase_date,
+      warranty_months: nil,
+      warranty_type: nil,
+      return_policy_days: nil,
+      return_deadline: nil,
+      confidence: 0.6,
+      source: 'gmail_heuristic',
       raw_email_id: message.id
     }
   end
 
   def extract_email_content(message)
-    content = ""
-    
-    if message.payload.parts
-      message.payload.parts.each do |part|
-        if part.mime_type == 'text/plain' || part.mime_type == 'text/html'
-          if part.body.data
-            content += Base64.urlsafe_decode64(part.body.data)
+    # Determine encoding of a part from headers
+    def part_encoding(part)
+      enc = part.headers&.find { |h| h.name&.downcase == 'content-transfer-encoding' }&.value&.downcase
+      enc&.strip
+    end
+
+    # Decode a part's body data according to its encoding; be permissive
+    def decode_part_data(part)
+      data = part.body&.data
+      return "" unless data
+
+      encoding = part_encoding(part)
+
+      case encoding
+      when 'base64'
+        begin
+          return Base64.urlsafe_decode64(data)
+        rescue ArgumentError
+          begin
+            return Base64.decode64(data)
+          rescue
+            # fall through
           end
         end
+      when 'quoted-printable'
+        begin
+          return Mail::Encodings::QuotedPrintable.decode(data)
+        rescue
+          # fall through
+        end
+      when '7bit'
+        # 7bit is already ASCII, return as-is
+        return data
       end
-    elsif message.payload.body.data
-      content = Base64.urlsafe_decode64(message.payload.body.data)
+
+      # Heuristics if no/unknown encoding header
+      # If it looks like already-decoded HTML/text, return as-is
+      return data if data.lstrip.start_with?('<!DOCTYPE', '<html', '<div', '<p', 'Subject:', 'From:', 'Hi all,', 'Dear')
+
+      # Try urlsafe then strict base64; if both fail, return original
+      begin
+        Base64.urlsafe_decode64(data)
+      rescue ArgumentError
+        begin
+          Base64.decode64(data)
+        rescue
+          data
+        end
+      end
     end
+
+    # Recursively walk parts to find text content
+    def collect_text_from_part(part)
+      texts = []
+      if part.parts && !part.parts.empty?
+        part.parts.each { |p| texts.concat(collect_text_from_part(p)) }
+      else
+        if part.mime_type == 'text/plain' || part.mime_type == 'text/html'
+          decoded = decode_part_data(part)
+          texts << decoded if decoded.present?
+        end
+      end
+      texts
+    end
+
+    raw_texts = []
+    if message.payload&.parts&.any?
+      message.payload.parts.each { |p| raw_texts.concat(collect_text_from_part(p)) }
+    elsif message.payload&.body&.data
+      # Synthesize a part-like object to reuse decoding logic
+      synthetic_part = Google::Apis::GmailV1::MessagePart.new(
+        mime_type: message.payload.mime_type,
+        headers: message.payload.headers,
+        body: message.payload.body
+      )
+      raw_texts << decode_part_data(synthetic_part)
+    end
+
+    content = raw_texts.join("\n\n")
 
     # Clean up HTML if present
     if content.include?('<')
@@ -157,7 +222,93 @@ class GmailService
       content = doc.text
     end
 
-    content
+    content.strip
+  end
+
+  # ---------- Heuristic helpers (no AI) ----------
+  def likely_receipt_email?(subject, content)
+    s = (subject || '').downcase
+    c = (content || '').downcase
+    keywords = %w[receipt order purchase invoice confirmation shipped delivered tracking paid payment]
+    # Must match at least one keyword in subject or first 2k of content
+    return true if keywords.any? { |k| s.include?(k) }
+    return keywords.any? { |k| c[0..2000].to_s.include?(k) }
+  end
+
+  def extract_merchant(from_header)
+    # Examples: "Amazon.com <order-update@amazon.com>" or "noreply@bestbuy.com"
+    return '' if from_header.blank?
+    name_match = from_header.match(/\A\s*"?([^"<]+?)"?\s*<[^>]+>\s*\z/)
+    if name_match
+      name = name_match[1].to_s.strip
+      return sanitize_merchant_name(name)
+    end
+    email_match = from_header.match(/[\w.+-]+@([\w.-]+)/)
+    domain = email_match && email_match[1]
+    return domain_to_merchant(domain) if domain
+    sanitize_merchant_name(from_header)
+  end
+
+  def sanitize_merchant_name(name)
+    cleaned = name.gsub(/(^\s+|\s+$)/, '')
+    cleaned = cleaned.gsub(/\bnoreply\b|\bno-reply\b|\bsupport\b|\borders?\b/i, '').strip
+    cleaned = cleaned.gsub(/[\(\)\[\]<>]/, '').strip
+    cleaned.squeeze(' ')
+  end
+
+  def domain_to_merchant(domain)
+    host = domain.to_s.downcase
+    # Take second-level label (amazon.com -> amazon)
+    label = host.split('.').reject { |p| %w[com net org co io ai app email info store shop gov edu].include?(p) }.first || host.split('.').first
+    label.to_s.gsub('-', ' ').split.map(&:capitalize).join(' ')
+  end
+
+  def safe_parse_email_date(date_str)
+    return nil if date_str.blank?
+    Time.parse(date_str).to_date
+  rescue ArgumentError
+    nil
+  end
+
+  def extract_product_name(subject, content)
+    # 1) Look for explicit item/product lines in body
+    body = content.to_s
+    if (m = body.match(/^(?:item|product)\s*[:\-]\s*(.+)$/i))
+      return m[1].strip[0..120]
+    end
+    if (m = body.match(/\b(?:model|sku)\s*[:\-]\s*([\w\- ]{3,})/i))
+      return m[1].strip[0..120]
+    end
+    # 2) Subject-based patterns
+    subj = subject.to_s
+    [
+      /receipt for\s+(.+)/i,
+      /order(?:\s+for)?\s+(.+)/i,
+      /your order of\s+(.+)/i,
+      /purchase(?:\s+of)?\s+(.+)/i
+    ].each do |rx|
+      if (m = subj.match(rx))
+        return m[1].strip[0..120]
+      end
+    end
+    # 3) Fallback to trimmed subject
+    subj.strip[0..120]
+  end
+
+  def extract_merchant_from_body(content)
+    body = content.to_s
+    # Common patterns: Sold by, Seller, Merchant, Store, From
+    if (m = body.match(/\b(?:sold by|seller|merchant|store|from)\b\s*[:\-]?\s*([^\n\r]{2,80})/i))
+      candidate = m[1].strip
+      # Trim trailing phrases
+      candidate = candidate.gsub(/\s*(inc\.|llc|ltd|co\.|corp\.)\.?\s*$/i, '').strip
+      return candidate[0..80]
+    end
+    # Look for "Thank you for your order from <Merchant>"
+    if (m = body.match(/order from\s+([^\n\r]{2,80})/i))
+      return m[1].strip[0..80]
+    end
+    nil
   end
 
   def parse_date(date_string)
