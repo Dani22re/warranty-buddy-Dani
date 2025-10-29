@@ -43,6 +43,7 @@
 <div class="row">
   <% if @gmail_connected %>
     <span class="badge ok">Connected</span>
+    <%= button_to "Parse Gmail Receipts", "/parse_gmail_receipts", method: :post, class: "btn btn-primary" %>
     <%= button_to "Disconnect Gmail", "/disconnect_gmail", method: :post, class: "btn btn-danger" %>
   <% else %>
     <%= button_to "Connect Gmail", "/auth/google_oauth2", method: :post, class: "btn btn-primary", data: { turbo: false } %>
@@ -72,6 +73,23 @@
       </form>
     </div>
   </details>
+
+  <% if @gmail_connected %>
+    <details class="section">
+      <summary>Gmail Receipt Parsing</summary>
+      <div style="margin-top:.75rem;">
+        <p>Click "Parse Gmail Receipts" to automatically scan your Gmail for purchase receipts and warranty information using AI.</p>
+        <p><strong>What it does:</strong></p>
+        <ul>
+          <li>🔍 Searches your Gmail for purchase-related emails (receipts, confirmations, orders)</li>
+          <li>🤖 Uses Google Gemini AI to intelligently identify actual product receipts</li>
+          <li>📦 Extracts product names, merchants, purchase dates, and warranty information</li>
+          <li>💾 Automatically adds new warranties to your dashboard</li>
+        </ul>
+        <p><em>Note: Only processes emails from the last year and skips duplicates.</em></p>
+      </div>
+    </details>
+  <% end %>
 
   <h3>Warranties</h3>
   <table aria-label="warranties">

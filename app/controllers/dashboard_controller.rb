@@ -178,7 +178,13 @@ class DashboardController < ApplicationController
       end
     rescue => e
       Rails.logger.error "Gmail parsing failed: #{e.message}"
-      redirect_to root_path, alert: "Failed to parse Gmail receipts: #{e.message}"
+      message = e.message.to_s
+      if message.include?("PERMISSION_DENIED") || message.include?("SERVICE_DISABLED") || message.include?("accessNotConfigured")
+        alert_msg = "Gmail API is disabled for your Google Cloud project. Please enable it here (must be owner): https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=#{Rails.application.credentials.dig(:google, :project_id) || 'YOUR_PROJECT_ID'}"
+        redirect_to root_path, alert: alert_msg
+      else
+        redirect_to root_path, alert: "Failed to parse Gmail receipts: #{e.message}"
+      end
     end
   end
 
