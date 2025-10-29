@@ -5,6 +5,7 @@ FactoryBot.define do
     purchase_date { Date.today }
     warranty_months { 12 }
     issue_description { nil }
+    gmail_uid { "test_user_123" }
 
     trait :expired do
       purchase_date { 2.years.ago }

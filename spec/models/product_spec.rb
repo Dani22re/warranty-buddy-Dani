@@ -13,7 +13,8 @@ RSpec.describe Product, type: :model do
         product_name: 'MacBook Pro',
         merchant: 'Apple Store',
         purchase_date: Date.today,
-        warranty_months: 12
+        warranty_months: 12,
+        gmail_uid: 'test_user_123'
       )
       expect(product).to be_valid
     end

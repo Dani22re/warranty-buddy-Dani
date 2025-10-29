@@ -63,6 +63,9 @@ group :development, :test do
   gem 'google-api-client'
   gem 'attr_encrypted'
   gem 'sidekiq'
+  gem 'gemini-ai', '~> 4.3.0'
+  gem 'nokogiri'
+  gem 'mail'
 
 end
 

@@ -39,7 +39,7 @@ RSpec.describe "dashboard/index", type: :view do
 
   it "shows empty warranties table when no products" do
     render
-    expect(rendered).to include("No warranties yet.")
+    expect(rendered).to include("Please connect your Gmail account to view warranties.")
   end
 
   context "with products" do

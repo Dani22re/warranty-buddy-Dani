@@ -27,6 +27,17 @@
     .status-badge { padding: .15rem .5rem; border-radius: .5rem; font-size: .85rem; }
     .status-active { background: #e6f4ea; color: #1e8e3e; }
     .status-expired { background: #fce8e6; color: #c5221f; }
+    .filter-form { margin: 1rem 0; }
+    .filter-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .search-input { padding: .4rem .5rem; width: 20rem; }
+    .filter-select { padding: .4rem .5rem; min-width: 10rem; }
+    .btn-sm { padding: .25rem .5rem; font-size: .8rem; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+    .modal-content { background: white; margin: 15% auto; padding: 2rem; width: 80%; max-width: 500px; border-radius: .5rem; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .close { font-size: 1.5rem; cursor: pointer; }
+    .modal-body textarea { width: 100%; height: 100px; padding: .5rem; margin: .5rem 0; }
+    .modal-footer { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1rem; }
   </style>
 </head>
 <body>
@@ -43,10 +54,35 @@
 <div class="row">
   <% if @gmail_connected %>
     <span class="badge ok">Connected</span>
+    <%= button_to "Parse Gmail Receipts", "/parse_gmail_receipts", method: :post, class: "btn btn-secondary" %>
     <%= button_to "Disconnect Gmail", "/disconnect_gmail", method: :post, class: "btn btn-danger" %>
   <% else %>
     <%= button_to "Connect Gmail", "/auth/google_oauth2", method: :post, class: "btn btn-primary", data: { turbo: false } %>
     <span class="badge not">Not Connected</span>
+  <% end %>
+</div>
+
+<!-- Search and Filter Section -->
+<div class="section">
+  <h3>Search & Filter</h3>
+  <%= form_with url: root_path, method: :get, local: true, class: "filter-form" do |form| %>
+    <div class="filter-row">
+      <%= form.text_field :search, placeholder: "Search products...", value: @search_term, class: "search-input" %>
+      <%= form.select :status, options_for_select([
+        ['All Status', ''],
+        ['Active', 'active'],
+        ['Expired', 'expired'],
+        ['Expiring Soon', 'expiring_soon']
+      ], @status_filter), {}, { class: "filter-select" } %>
+      <%= form.select :merchant, options_for_select([['All Merchants', '']] + (@merchants || []).map { |m| [m, m] }, @merchant_filter), {}, { class: "filter-select" } %>
+      <%= form.select :sort, options_for_select([
+        ['Sort by Expiry', 'expiry_date'],
+        ['Sort by Product', 'product_name'],
+        ['Sort by Purchase Date', 'purchase_date'],
+        ['Sort by Merchant', 'merchant']
+      ], @sort_by), {}, { class: "filter-select" } %>
+      <%= form.submit "Filter", class: "btn btn-secondary" %>
+    </div>
   <% end %>
 </div>
 
@@ -73,35 +109,146 @@
     </div>
   </details>
 
-  <h3>Warranties</h3>
+  <h3>Warranties (<%= @warranties.count %>)</h3>
   <table aria-label="warranties">
     <thead>
       <tr>
-        <th>Product</th><th>Merchant</th><th>Purchase Date</th><th>Warranty (months)</th><th>Expires</th><th>Status</th>
+        <th>Product</th><th>Merchant</th><th>Purchase Date</th><th>Warranty</th><th>Return Policy</th><th>Status</th><th>Actions</th>
       </tr>
     </thead>
     <tbody>
       <% if @warranties.empty? %>
-        <tr><td colspan="6">No warranties yet.</td></tr>
+        <% if @gmail_connected %>
+          <tr><td colspan="7">No warranties yet. Connect Gmail and parse receipts or add manually.</td></tr>
+        <% else %>
+          <tr><td colspan="7">Please connect your Gmail account to view warranties.</td></tr>
+        <% end %>
       <% else %>
         <% @warranties.each do |w| %>
           <tr>
-            <td><%= w.product_name %></td>
+            <td>
+              <%= w.product_name %>
+              <% if w.source == 'gmail_ai_parsed' %>
+                <span class="badge" style="font-size: 0.7rem; background: #e3f2fd; color: #1976d2;">AI</span>
+              <% end %>
+            </td>
             <td><%= w.merchant %></td>
             <td><%= w.purchase_date.strftime("%Y-%m-%d") %></td>
-            <td><%= w.warranty_months %></td>
-            <td><%= w.expiry_date&.strftime("%Y-%m-%d") || '-' %></td>
             <td>
-              <% if w.expiry_date && w.expiry_date >= Date.today %>
-                <span class="status-badge status-active">Active</span>
+              <%= w.warranty_months %> months
+              <% if w.warranty_type.present? %>
+                <br><small style="color: #666;">(<%= w.warranty_type %>)</small>
+              <% end %>
+              <% if w.expiry_date %>
+                <br><small style="color: #666;">Expires: <%= w.expiry_date.strftime("%Y-%m-%d") %></small>
+                <% if w.days_until_expiry && w.days_until_expiry > 0 %>
+                  <br><small style="color: #666;">(<%= w.days_until_expiry %> days left)</small>
+                <% end %>
+              <% end %>
+            </td>
+            <td>
+              <% if w.return_policy_days.present? %>
+                <%= w.return_policy_days %> days
+              <% elsif w.return_deadline.present? %>
+                Until <%= w.return_deadline.strftime("%Y-%m-%d") %>
               <% else %>
+                -
+              <% end %>
+            </td>
+            <td>
+              <% case w.status %>
+              <% when 'active' %>
+                <span class="status-badge status-active">Active</span>
+              <% when 'expiring_soon' %>
+                <span class="status-badge" style="background: #fff3cd; color: #856404;">Expiring Soon</span>
+              <% when 'expired' %>
                 <span class="status-badge status-expired">Expired</span>
               <% end %>
+            </td>
+            <td>
+              <button onclick="showIssueModal(<%= w.id %>, '<%= w.product_name %>')" class="btn btn-sm">Report Issue</button>
             </td>
           </tr>
         <% end %>
       <% end %>
     </tbody>
   </table>
+
+  <!-- Issue Reporting Modal -->
+  <div id="issueModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Report Product Issue</h3>
+        <span class="close" onclick="closeIssueModal()">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p><strong>Product:</strong> <span id="modalProductName"></span></p>
+        <label for="issueDescription">Describe the issue:</label>
+        <textarea id="issueDescription" placeholder="Describe what's wrong with the product..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button onclick="closeIssueModal()" class="btn btn-secondary">Cancel</button>
+        <button onclick="checkWarrantyEligibility()" class="btn btn-primary">Check Warranty Coverage</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.currentProductId = window.currentProductId || null;
+
+    function showIssueModal(productId, productName) {
+      window.currentProductId = productId;
+      document.getElementById('modalProductName').textContent = productName;
+      document.getElementById('issueDescription').value = '';
+      document.getElementById('issueModal').style.display = 'block';
+    }
+
+    function closeIssueModal() {
+      document.getElementById('issueModal').style.display = 'none';
+      window.currentProductId = null;
+    }
+
+    function checkWarrantyEligibility() {
+      const issueDescription = document.getElementById('issueDescription').value;
+      if (!issueDescription.trim()) {
+        alert('Please describe the issue');
+        return;
+      }
+
+      fetch('/check_warranty_eligibility', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify({
+          product_id: window.currentProductId,
+          issue_description: issueDescription
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert(`Warranty Coverage: ${data.is_covered ? 'COVERED' : 'NOT COVERED'}\n\nReasoning: ${data.reasoning}\n\nRecommended Action: ${data.recommended_action}`);
+        closeIssueModal();
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error checking warranty eligibility: ' + error.message);
+      });
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      const modal = document.getElementById('issueModal');
+      if (event.target == modal) {
+        closeIssueModal();
+      }
+    }
+  </script>
 </body>
 </html>

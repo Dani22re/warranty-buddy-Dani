@@ -14,4 +14,7 @@ Rails.application.routes.draw do
   get "dashboard/api_health"
   get "dashboard/reset"
   post "/disconnect_gmail", to: "dashboard#disconnect_gmail"
+  post "/parse_gmail_receipts", to: "dashboard#parse_gmail_receipts"
+  post "/check_warranty_eligibility", to: "dashboard#check_warranty_eligibility"
+  get "/lookup_warranty_info", to: "dashboard#lookup_warranty_info"
 end

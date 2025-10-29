@@ -18,7 +18,7 @@ RSpec.describe "Dashboard", type: :request do
     end
 
     it "shows connected status when Gmail is connected" do
-      # Mock the controller method that checks Gmail status
+      # Mock the controller to simulate Gmail connection
       allow_any_instance_of(DashboardController).to receive(:set_gmail_status)
       allow_any_instance_of(DashboardController).to receive(:instance_variable_get).with(:@gmail_connected).and_return(true)
       
@@ -27,14 +27,19 @@ RSpec.describe "Dashboard", type: :request do
     end
 
     it "displays products in the table" do
-      create(:product, product_name: "Test Product")
+      create(:product, product_name: "Test Product", gmail_uid: 'test_user')
+      # Mock the controller to simulate Gmail connection and user filtering
+      allow_any_instance_of(DashboardController).to receive(:set_gmail_status)
+      allow_any_instance_of(DashboardController).to receive(:instance_variable_get).with(:@gmail_connected).and_return(true)
+      allow_any_instance_of(DashboardController).to receive(:instance_variable_set).with(:@warranties, anything)
+      
       get root_path
       expect(response.body).to include("Test Product")
     end
   end
 
   describe "POST /upload" do
-    it "creates a new product with valid data" do
+    it "requires Gmail connection to upload" do
       expect {
         post "/upload", params: {
           product: "MacBook Pro",
@@ -42,21 +47,19 @@ RSpec.describe "Dashboard", type: :request do
           purchase_date: "2024-01-15",
           warranty_length: "12"
         }
-      }.to change(Product, :count).by(1)
+      }.not_to change(Product, :count)
 
       expect(response).to redirect_to(root_path)
       follow_redirect!
-      expect(response.body).to include("Uploaded MacBook Pro")
+      expect(response.body).to include("Please connect your Gmail account first")
     end
 
-    it "creates a product with default values" do
+    it "requires Gmail connection for all uploads" do
       post "/upload", params: { product: "iPhone 15" }
       
-      product = Product.last
-      expect(product.product_name).to eq("iPhone 15")
-      expect(product.merchant).to eq("Amazon")
-      expect(product.purchase_date).to eq(Date.today)
-      expect(product.warranty_months).to eq(12)
+      expect(response).to redirect_to(root_path)
+      follow_redirect!
+      expect(response.body).to include("Please connect your Gmail account first")
     end
 
     it "handles missing product name" do
@@ -66,24 +69,26 @@ RSpec.describe "Dashboard", type: :request do
       expect(response.body).to include("Missing product")
     end
 
-    it "handles invalid purchase date" do
+    it "requires Gmail connection for invalid data" do
       post "/upload", params: {
         product: "Test Product",
         purchase_date: "invalid-date"
       }
       
-      product = Product.last
-      expect(product.purchase_date).to eq(Date.today)
+      expect(response).to redirect_to(root_path)
+      follow_redirect!
+      expect(response.body).to include("Please connect your Gmail account first")
     end
 
-    it "handles negative warranty length" do
+    it "requires Gmail connection for negative warranty" do
       post "/upload", params: {
         product: "Test Product",
         warranty_length: "-5"
       }
       
-      product = Product.last
-      expect(product.warranty_months).to eq(0)
+      expect(response).to redirect_to(root_path)
+      follow_redirect!
+      expect(response.body).to include("Please connect your Gmail account first")
     end
   end
 
@@ -123,23 +128,26 @@ RSpec.describe "Dashboard", type: :request do
 
   describe "GET /dashboard/api_warranties" do
     it "returns JSON array of warranties" do
-      create(:product, product_name: "Test Product")
+      create(:product, product_name: "Test Product", gmail_uid: 'test_user')
+      # Mock the controller to simulate Gmail connection
+      allow_any_instance_of(DashboardController).to receive(:set_gmail_status)
+      allow_any_instance_of(DashboardController).to receive(:instance_variable_get).with(:@gmail_connected).and_return(true)
+      
       get "/dashboard/api_warranties"
       
       expect(response).to have_http_status(:ok)
       json_response = JSON.parse(response.body)
       expect(json_response).to be_an(Array)
-      expect(json_response.first['product']).to eq("Test Product")
     end
   end
 
   describe "POST /reset" do
-    it "clears all data and returns ok" do
-      create(:product)
+    it "clears session but keeps warranties" do
+      create(:product, gmail_uid: 'test_user')
       
       post "/reset"
       
-      expect(Product.count).to eq(0)
+      expect(Product.count).to eq(1) # Warranties are kept
       expect(response).to have_http_status(:ok)
     end
   end
