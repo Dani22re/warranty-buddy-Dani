@@ -379,6 +379,9 @@
     const purchaseDate = cells[2].textContent.trim();
     const warrantyMonths = cells[3].textContent.replace('~', '').trim();
     
+    // Debug logging
+    console.log('Original purchase date from table:', purchaseDate);
+    
     // Populate the edit form
     document.getElementById('editWarrantyId').value = warrantyId;
     document.getElementById('editProductName').value = productName;
@@ -428,6 +431,16 @@
     const warrantyId = formData.get('id');
     const updateUrl = `/warranties/${warrantyId}`;
     
+    const updateData = {
+      product_name: formData.get('product_name'),
+      merchant: formData.get('merchant'),
+      purchase_date: formData.get('purchase_date'),
+      warranty_months: formData.get('warranty_months')
+    };
+    
+    // Debug logging
+    console.log('Sending update data:', updateData);
+    
     fetch(updateUrl, {
       method: 'PATCH',
       headers: {
@@ -435,12 +448,7 @@
         'Content-Type': 'application/json'
       },
       credentials: 'same-origin',
-      body: JSON.stringify({
-        product_name: formData.get('product_name'),
-        merchant: formData.get('merchant'),
-        purchase_date: formData.get('purchase_date'),
-        warranty_months: formData.get('warranty_months')
-      })
+      body: JSON.stringify(updateData)
     })
     .then(response => {
       if (response.ok) {
