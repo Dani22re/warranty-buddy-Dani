@@ -1,6 +1,6 @@
 # Gemfile
 
-# Lock Ruby so Heroku uses the same version
+# Lock Ruby so Heroku and local both use 3.2.2
 ruby "3.2.2"
 
 source "https://rubygems.org"
@@ -31,18 +31,18 @@ gem "thruster", require: false       # Puma HTTP compression/X-Sendfile
 # --- Images / variants (Active Storage use) ---
 gem "image_processing", "~> 1.2"
 
-# --- App features you used and likely need in production ---
+# --- App features used in production ---
 gem "omniauth", "~> 2.1"
 gem "omniauth-rails_csrf_protection", "~> 1.0"
 gem "omniauth-google-oauth2", "~> 1.1"
 gem "google-api-client", "~> 0.53"
 
-gem "sidekiq"                        # If you run background jobs
-gem "gemini-ai", "~> 4.3.0"          # If you actually call Gemini in prod
+gem "sidekiq"                        # Only if you intend to run background jobs
+gem "gemini-ai", "~> 4.3.0"
 gem "nokogiri"
 gem "mail"
 gem "pdf-reader"
-gem "rtesseract"                     # Needs the `tesseract-ocr` binary at runtime
+gem "rtesseract"                     # Needs the tesseract-ocr binary (see §8)
 gem "chronic"
 gem "money"
 gem "icalendar"
