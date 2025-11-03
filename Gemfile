@@ -1,7 +1,7 @@
 # Gemfile
 
 # Lock Ruby so Heroku uses the same version
-ruby "3.3.9"
+ruby "3.2.2"
 
 source "https://rubygems.org"
 
