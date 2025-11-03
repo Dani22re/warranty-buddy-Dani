@@ -1,3 +1,8 @@
+# config/initializers/omniauth.rb
+
+# Prevent crashes during asset precompile if OmniAuth isn't loaded yet
+return unless defined?(OmniAuth)
+
 OmniAuth.config.allowed_request_methods = %i[post get]
 
 client_id     = ENV["GOOGLE_CLIENT_ID"]     || Rails.application.credentials.dig(:google, :client_id)
