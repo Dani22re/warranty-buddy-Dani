@@ -1,10 +1,5 @@
 # Gemfile
 
-<<<<<<< HEAD
-# Lock Ruby so Heroku and local both use 3.2.2
-=======
-# Lock Ruby so Heroku uses the same version
->>>>>>> Pin Ruby to 3.2.2 and refresh lockfile
 ruby "3.2.2"
 
 source "https://rubygems.org"
