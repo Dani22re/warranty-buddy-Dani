@@ -72,3 +72,4 @@ group :test do
   gem "simplecov", require: false
   gem "database_cleaner-active_record"
 end
+gem "sqlite3", "~> 2.1"
